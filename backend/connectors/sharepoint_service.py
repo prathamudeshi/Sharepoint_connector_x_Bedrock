@@ -93,24 +93,41 @@ class SharePointService:
 
     def get_file_content(self, file_id=None, download_url=None):
         """
-        Downloads file content. 
+        Downloads file content.
+
         If download_url is provided (from list_files), use it.
         Otherwise, fetch the item to get the URL first.
         """
-        if not download_url and file_id:
-             # Fetch item metadata to get download URL
-             endpoint = f"https://graph.microsoft.com/v1.0/me/drive/items/{file_id}"
-             resp = requests.get(endpoint, headers=self.get_headers())
-             if resp.status_code == 200:
-                 download_url = resp.json().get('@microsoft.graph.downloadUrl')
-        
-        if download_url:
-            # Download the actual content
-            # Note: For large files, stream it. For this demo, we assume small text/pdfs.
+        try:
+            # Step 1: Fetch download URL if not provided
+            if not download_url:
+                if not file_id:
+                    raise ValueError("Either file_id or download_url must be provided")
+
+                endpoint = f"https://graph.microsoft.com/v1.0/me/drive/items/{file_id}"
+                resp = requests.get(endpoint, headers=self.get_headers())
+
+                if resp.status_code != 200:
+                    raise Exception(
+                        f"Failed to fetch file metadata: {resp.status_code}, {resp.text[:200]}"
+                    )
+
+                download_url = resp.json().get('@microsoft.graph.downloadUrl')
+                if not download_url:
+                    raise Exception("Download URL not found in metadata")
+
+            # Step 2: Download file content
             file_resp = requests.get(download_url)
             if file_resp.status_code == 200:
-                # We need to handle different file types. 
-                # For now, we return binary, and let the caller handle parsing (e.g. PDF vs Text)
                 return file_resp.content
+            else:
+                raise Exception(
+                    f"Error downloading file: {file_resp.status_code}, {file_resp.text[:200]}"
+                )
+
+        except Exception as e:
+            print(f"Exception downloading file: {e}")
+            return None
+
         
         return None

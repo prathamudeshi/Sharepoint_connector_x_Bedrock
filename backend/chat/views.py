@@ -64,8 +64,13 @@ class ChatView(APIView):
                         if not file_id and not download_url:
                              continue
 
-                        content = sp_service.get_file_content(file_id=file_id, download_url=download_url)
-                        
+                        try:
+                            content = sp_service.get_file_content(file_id=file_id, download_url=download_url)
+                        except Exception as e:
+                            logger.error(f"Download error for {file_name}: {e}")
+                            full_context.append(f"Error downloading {file_name}: {e}")
+                            content = None
+
                         if content:
                             lower_name = file_name.lower() if file_name else ""
                             mime_type, _ = mimetypes.guess_type(file_name)
@@ -109,6 +114,7 @@ class ChatView(APIView):
                                     elif lower_name.endswith('.webp'):
                                         mime_type = 'image/webp'
                                 
+                                full_context.append(f"Filename: {file_name}")
                                 full_context.append({
                                     'mime_type': mime_type,
                                     'data': content
@@ -121,6 +127,8 @@ class ChatView(APIView):
                                     full_context.append(f"Filename: {file_name}\nContent:\n{text_content}")
                                 except:
                                     full_context.append(f"Skipping file {file_name}: Unsupported format")
+                        else:
+                             full_context.append(f"Error reading file {file_name}: Download failed or content is empty.")
                             
                 except Exception as sp_e:
                     logger.error(f"Error fetching SharePoint context: {sp_e}")
